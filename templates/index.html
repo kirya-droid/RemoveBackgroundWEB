@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Удаление фона</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0; /* Softer background color */
+        }
+
+        h1 {
+            color: #444; /* Darker shade for better contrast */
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            max-width: 800px;
+            width: 100%;
+            border: 1px solid #ccc; /* Subtle border */
+            border-radius: 10px; /* Rounded corners */
+            padding: 20px; /* Padding inside the container */
+            background-color: #fff; /* White background for contrast */
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+        }
+
+        .form-container {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            border: 2px dashed #ccc; /* Lighter dashed border */
+            border-radius: 5px;
+            background-color: #f9f9f9; /* Very light background for the input */
+            cursor: pointer;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #6c757d; /* Neutral color */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s; /* Smooth transition */
+        }
+
+        button:hover {
+            background-color: #5a6268; /* Slightly darker on hover */
+        }
+
+        .images-container {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .image-box {
+            width: 300px;
+            height: 300px;
+            background-color: #eaeaea; /* Light gray background */
+            border: 1px solid #ddd; /* Subtle border */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .image-box img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: cover;
+        }
+
+        .image-label {
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #666; /* Softer color for labels */
+        }
+
+        /* Стили для анимации загрузки */
+        .loader {
+            border: 8px solid #f3f3f3; /* Light gray */
+            border-top: 8px solid #007bff; /* Blue for loader */
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            display: none; /* Скрыть по умолчанию */
+            margin: 20px auto; /* Центрировать */
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .download-button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #007bff; /* Blue for download button */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            display: none; /* Скрыть по умолчанию */
+            text-decoration: none; /* Убрать подчеркивание */
+            text-align: center; /* Центрировать текст */
+            transition: background-color 0.3s; /* Smooth transition */
+        }
+
+        .download-button.show {
+            display: block; /* Показывать при необходимости */
+        }
+
+        .download-button:hover {
+            background-color: #0056b3; /* Darker blue on hover */
+        }
+    </style>
+</head>
+<body>
+    <h1>Удаление фона с изображения</h1>
+    <div class="container">
+        <div class="form-container">
+            <form id="upload-form" action="/remove-background" method="POST" enctype="multipart/form-data" onsubmit="showLoader()">
+                <input type="file" name="image" id="image-input" accept="image/*" required>
+                <button type="submit">Загрузить и удалить фон</button>
+            </form>
+        </div>
+
+        <!-- Показ загруженного изображения -->
+        <div class="images-container" id="preview-container" style="display: none;">
+            <div class="image-result">
+                <div class="image-label">Исходное изображение:</div>
+                <div class="image-box">
+                    <img id="image-preview" src="#" alt="Загруженное изображение">
+                </div>
+            </div>
+        </div>
+
+        <!-- Отображение обработанного изображения (если оно есть) -->
+        <div class="images-container" id="processed-container" style="{% if not image_url %}display: none;{% endif %}">
+            <div class="image-result">
+                <div class="image-label">Обработанное изображение:</div>
+                <div class="image-box">
+                    <img id="processed-image" src="{{ image_url }}" alt="Обработанное изображение">
+                </div>
+            </div>
+        </div>
+
+        <!-- Кнопка для скачивания обработанного изображения -->
+        <a href="{{ image_url }}" download class="download-button {% if image_url %}show{% endif %}" id="download-button">Скачать обработанное изображение</a>
+
+        <!-- Анимация загрузки -->
+        <div class="loader" id="loader"></div>
+    </div>
+
+    <script>
+        document.getElementById('image-input').addEventListener('change', function(event) {
+            var file = event.target.files[0];
+            if (file) {
+                // Скрыть кнопку скачивания и контейнер с обработанным изображением
+                document.getElementById('processed-container').style.display = 'none';
+                document.getElementById('download-button').classList.remove('show');
+
+                // Показать контейнер для превью загруженного изображения
+                document.getElementById('preview-container').style.display = 'flex';
+
+                // Показать загруженное изображение
+                var reader =    f new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('image-preview').src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function showLoader() {
+            // Показать анимацию загрузки
+            document.getElementById('loader').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
